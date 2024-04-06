@@ -1,7 +1,7 @@
 import { SerializedErrorOutput } from "./@types/serialized-error-output";
 
 export default abstract class BaseCustomError extends Error {
-  protected statusCode: number;
+  public statusCode: number;
 
   public constructor(message: string, statusCode: number) {
     super(message);

@@ -17,6 +17,7 @@ import { generateEmailVerificationToken } from "../utils/account-verification";
 import { publicDecrypt } from "crypto";
 import { UserSignInSchema } from "../schema/user-schema";
 import { validate } from "../middlewars/validation";
+import CustomError from "../error/custom-error";
 
 interface SignUpRequestBody {
   username: string;
@@ -70,29 +71,43 @@ export class UserController extends Controller {
       const jwtToken = await generateSignature({
         userId: user._id,
       });
-
       return { token: jwtToken };
     } catch (error) {
       throw error;
     }
   }
 
-  // @SuccessResponse(StatusCode.OK, "OK")
-  // @Post("/login")
-  // @Middlewares(validate(UserSignInSchema))
-  // public async LoginWithEmail(
-  //   @Body() requestBody: LoginRequestBody
-  // ): Promise<{ token: string }> {
-  //   try {
-  //     const { email, password } = requestBody;
-
-  //     const jwtToken = await this.userService.Login({ email, password });
-
-  //     return {
-  //       token: jwtToken,
-  //     };
-  //   } catch (error) {
-  //     throw error;
-  //   }
-  // }
+  @SuccessResponse(StatusCode.OK, "OK")
+  @Post("/login")
+  @Middlewares(validate(UserSignInSchema))
+  public async LoginWithEmail(
+    @Body() requestBody: LoginRequestBody
+  ): Promise<{ token: string }> {
+    try {
+      const { email, password } = requestBody;
+      // Call the userService to perform the login operation
+      const jwtToken = await this.userService.Login({ email, password });
+      console.log(jwtToken);
+      if (!jwtToken) {
+        // Handle failed login with a specific error
+        throw new CustomError(
+          "email or password is incorrect",
+          StatusCode.Unauthorized
+        );
+      }
+      // Return the JWT token in the response
+      return {
+        token: jwtToken,
+      };
+    } catch (error) {
+      // Handle specific error types
+      if (error instanceof CustomError) {
+        // More fine-grained status codes based on CustomError type
+        throw error;
+      } else {
+        console.error("Unexpected error:", error);
+        throw new CustomError("Login failed", StatusCode.InternalServerError);
+      }
+    }
+  }
 }

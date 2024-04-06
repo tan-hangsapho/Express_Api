@@ -1,15 +1,17 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import CustomError from "../error/custom-error";
+import { StatusCode } from "./consts";
 require("dotenv").config();
-
 const salt = 10;
-export const generatePassword = async (passowrd: string) => {
+export const generatePassword = async (password: string) => {
   try {
-    return await bcrypt.hash(passowrd, salt);
+    return await bcrypt.hash(password, salt);
   } catch (error) {
     throw new Error("Unable to generate password");
   }
 };
+
 export const validationPassword = async ({
   enterPassword,
   savedPassword,
@@ -17,7 +19,11 @@ export const validationPassword = async ({
   enterPassword: string;
   savedPassword: string;
 }) => {
-  return (await generatePassword(enterPassword)) === savedPassword;
+  try {
+    return await bcrypt.compare(enterPassword, savedPassword);
+  } catch (error) {
+    throw new Error("Error validating password"); // Consider more specific error handling
+  }
 };
 
 export const generateSignature = async (payload: object): Promise<string> => {
@@ -26,6 +32,9 @@ export const generateSignature = async (payload: object): Promise<string> => {
       expiresIn: process.env.JWT_EXPIRES_IN,
     });
   } catch (error) {
-    throw new Error("Unable to generate signature from jwt");
+    throw new CustomError(
+      "Unable to generate signature from jwt",
+      StatusCode.BadRequest
+    );
   }
 };

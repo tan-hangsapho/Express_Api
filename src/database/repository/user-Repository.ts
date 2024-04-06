@@ -1,3 +1,5 @@
+import CustomError from "../../error/custom-error";
+import { StatusCode } from "../../utils/consts";
 import UserModel, { IUser } from "../models/user.model";
 import { UserCreateRepository } from "./@types/user-Repository";
 interface UpdateVerificationTokenData {
@@ -7,9 +9,14 @@ interface UpdateVerificationTokenData {
 export class UserRepository {
   async createUser({ username, email, password }: UserCreateRepository) {
     try {
-      const existingUser = await this.FindUser({ email });
+      const existingUser = await this.FindEmailUser({ email });
       if (existingUser) {
-        throw new Error("Please,verifiy your email");
+        throw new CustomError("Please,verifiy your email", StatusCode.Found);
+      } else if (existingUser === email) {
+        throw new CustomError(
+          "Account already exist,Please,verifiy your email",
+          StatusCode.Found
+        );
       }
       const user = new UserModel({
         username,
@@ -22,21 +29,29 @@ export class UserRepository {
       throw err;
     }
   }
-  async FindUser({ email }: { email: string }) {
+  async FindEmailUser({ email }: { email: string }) {
     try {
-      const existingUser = await UserModel.findOne({ email: email });
-      return existingUser;
+      const existingUser = await UserModel.findOne({ email });
+      return existingUser; // If user not found, this will return null
     } catch (err) {
-      return null;
+      console.error("Error finding user by email:", err);
+      throw new CustomError(
+        "Failed to find user by email",
+        StatusCode.InternalServerError
+      );
     }
   }
+
   async FindUserById({ id }: { id: string }) {
     try {
       const existingUser = await UserModel.findById(id);
 
       return existingUser;
     } catch (error) {
-      throw new Error("Unable to Find User in Database");
+      throw new CustomError(
+        "Unable to Find User in Database",
+        StatusCode.InternalServerError
+      );
     }
   }
   async findUserByUsernameOrEmail(
@@ -58,7 +73,10 @@ export class UserRepository {
       await UserModel.updateOne({ email }, { $set: { verificationToken } });
     } catch (error) {
       console.error("Error updating verification token:", error);
-      throw new Error("Failed to update verification token");
+      throw new CustomError(
+        "Failed to update verification token",
+        StatusCode.Unauthorized
+      );
     }
   }
 }

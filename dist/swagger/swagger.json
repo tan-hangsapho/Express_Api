@@ -51,6 +51,22 @@
 				"type": "object",
 				"additionalProperties": false
 			},
+			"LoginRequestBody": {
+				"properties": {
+					"email": {
+						"type": "string"
+					},
+					"password": {
+						"type": "string"
+					}
+				},
+				"required": [
+					"email",
+					"password"
+				],
+				"type": "object",
+				"additionalProperties": false
+			},
 			"mongoose.Types.ObjectId": {
 				"type": "string"
 			},
@@ -177,6 +193,46 @@
 						}
 					}
 				]
+			}
+		},
+		"/user/login": {
+			"post": {
+				"operationId": "LoginWithEmail",
+				"responses": {
+					"200": {
+						"description": "OK",
+						"content": {
+							"application/json": {
+								"schema": {
+									"properties": {
+										"token": {
+											"type": "string"
+										}
+									},
+									"required": [
+										"token"
+									],
+									"type": "object"
+								}
+							}
+						}
+					}
+				},
+				"tags": [
+					"Users"
+				],
+				"security": [],
+				"parameters": [],
+				"requestBody": {
+					"required": true,
+					"content": {
+						"application/json": {
+							"schema": {
+								"$ref": "#/components/schemas/LoginRequestBody"
+							}
+						}
+					}
+				}
 			}
 		},
 		"/movie/create": {

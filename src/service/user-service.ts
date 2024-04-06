@@ -3,11 +3,13 @@ import AccountVerificationModel from "../database/models/account-verification.mo
 import { IUser } from "../database/models/user.model";
 import { AccountVerificationRepository } from "../database/repository/account-verification-repos";
 import { UserRepository } from "../database/repository/user-Repository";
+import CustomError from "../error/custom-error";
 import {
   UserSchemaType,
   UserSignInSchemaType,
 } from "../schema/@types/userSchema.type";
 import { generateEmailVerificationToken } from "../utils/account-verification";
+import { StatusCode } from "../utils/consts";
 import {
   generatePassword,
   generateSignature,
@@ -54,7 +56,7 @@ export class AuthService {
       await accountVerification.save();
       const existedUser = await this.userRepo.FindUserById({ id: userId });
       if (!existedUser) {
-        throw new Error("User does not exist!");
+        throw new CustomError("User does not exist!", StatusCode.NotFound);
       }
       return await this.sendVerificationEmail(existedUser, generateToken);
     } catch (error) {
@@ -92,10 +94,12 @@ export class AuthService {
     } catch (error) {
       // Handle error
       console.error("Error sending email:", error);
-      throw new Error("Failed to send verification email.");
+      throw new CustomError(
+        "Failed to send verification email.",
+        StatusCode.BadRequest
+      );
     }
   }
-
   async VerifyEmailToken(token: string) {
     try {
       // Find the account verification entry in the database using the token
@@ -104,7 +108,10 @@ export class AuthService {
           token,
         });
       if (!accountVerification) {
-        throw new Error("Verification token is invalid"); // Token verification failed
+        throw new CustomError(
+          "Verification token is invalid",
+          StatusCode.NotFound
+        ); // Token verification failed
       }
       // Convert the userId to string
       const user = await this.userRepo.FindUserById({
@@ -112,7 +119,7 @@ export class AuthService {
       });
       // Fetch the user using the converted userId
       if (!user) {
-        throw new Error("User not found");
+        throw new CustomError("User not found", StatusCode.NotFound);
       }
       // Update the user's isVerified status to true
       user.isVerified = true;
@@ -125,26 +132,42 @@ export class AuthService {
       return user;
     } catch (error) {
       console.error("Error verifying token:", error);
-      throw new Error("Failed to verify token.");
+      throw new CustomError("Failed to verify token.", StatusCode.NotFound);
     }
   }
+  async Login(userDetails: UserSignInSchemaType): Promise<string> {
+    try {
+      // Call the user repository to find the user by email
+      const user = await this.userRepo.FindEmailUser({
+        email: userDetails.email,
+      });
 
-  async Login(userDetails: UserSignInSchemaType) {
-    const user = await this.userRepo.FindUser({ email: userDetails.email });
+      if (!user) {
+        throw new CustomError("User not found", StatusCode.NotFound);
+      }
 
-    if (!user) {
-      throw new Error("User not exist");
+      // Check if the provided password matches the user's password
+      const isPasswordValid = await validationPassword({
+        enterPassword: userDetails.password,
+        savedPassword: user.password as string,
+      });
+
+      if (!isPasswordValid) {
+        throw new CustomError(
+          "Invalid email or password", // Generic, for security
+          StatusCode.Unauthorized
+        );
+      }
+
+      // If authentication succeeds, generate a JWT token
+      const token = await generateSignature({ userId: user._id });
+      return token;
+    } catch (error) {
+      console.error("Error logging in:", error);
+      throw new CustomError(
+        "Email and password are incorrect",
+        StatusCode.Unauthorized
+      );
     }
-    const isPwdCorrect = await validationPassword({
-      enterPassword: userDetails.password,
-      savedPassword: user.password as string,
-    });
-
-    if (!isPwdCorrect) {
-      throw new Error("Email or Password is incorrect");
-    }
-    const token = await generateSignature({ userId: user._id });
-
-    return token;
   }
 }
