@@ -26,7 +26,6 @@ userRouter.get(
     try {
       const token = req.query.token as string; // Assuming the token is passed as a query parameter
       await controllers.VerifyEmail(token);
-
       return res.status(StatusCode.Found).json("Successfully verifiy");
     } catch (error: any) {
       res.status(StatusCode.BadRequest).json({ message: error.message });

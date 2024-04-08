@@ -3,7 +3,7 @@ import mongoose, { Document, Model } from "mongoose";
 export interface IAccountVerificationDocument extends Document {
   userId: mongoose.Types.ObjectId;
   emailVerificationToken: string;
-  createdAt: Date;
+  timestamp: Date;
 }
 
 export interface IAccountVerificationModel
@@ -21,6 +21,7 @@ const accountVerificationSchema = new mongoose.Schema({
       return true;
     },
   },
+  timestamp: { type: Date, default: Date.now }, // Add timestamp field with default value of current date/time
 });
 
 const AccountVerificationModel = mongoose.model<

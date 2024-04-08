@@ -29,10 +29,8 @@ export class AuthService {
   async SignUp(userDetails: UserSchemaType): Promise<UserSignUpResult> {
     try {
       const { username, email, password } = userDetails;
-
       // Convert User Password to Hash Password
       const hashedPassword = await generatePassword(password);
-
       // Save User to Database
       const newUser = await this.userRepo.createUser({
         username,
@@ -48,9 +46,11 @@ export class AuthService {
   async SendVerifyEmailToken({ userId }: { userId: string }) {
     try {
       const generateToken = generateEmailVerificationToken();
+      const timestamp = new Date();
       const accountVerification = new AccountVerificationModel({
         userId,
         emailVerificationToken: generateToken,
+        timestamp,
       });
 
       await accountVerification.save();
@@ -107,11 +107,43 @@ export class AuthService {
         await this.accountVerificationRepo.FindAccountVerificationToken({
           token,
         });
+
+      // Check if the token is not found
       if (!accountVerification) {
         throw new CustomError(
           "Verification token is invalid",
           StatusCode.NotFound
-        ); // Token verification failed
+        );
+      }
+
+      const expirationDate = new Date(accountVerification.timestamp);
+      expirationDate.setMinutes(expirationDate.getMinutes() + 1); // Add 1 minute
+      const now = new Date();
+      if (now > expirationDate) {
+        // Token has expired - Update Logic:
+        await this.accountVerificationRepo.deleteAccountVerification({ token }); // Delete old entry
+        const newToken = generateEmailVerificationToken(); // Generate new token
+        // Get user information based on the account verification entry
+        const user = await this.userRepo.FindUserById({
+          id: accountVerification.userId.toString(),
+        });
+        if (!user) {
+          throw new CustomError("User not found", StatusCode.NotFound);
+        }
+        // Create a new account verification entry
+        const newAccountVerification = new AccountVerificationModel({
+          // Assuming you have an AccountVerification model
+          emailVerificationToken: newToken,
+          userId: user.id, // Assuming your User object has an 'id' property
+          timestamp: new Date(),
+        });
+        await newAccountVerification.save();
+        // Resend verification email with the new token
+        await this.sendVerificationEmail(user, newToken);
+        throw new CustomError(
+          "Verification token has expired. A new verification email has been sent.",
+          StatusCode.BadRequest
+        );
       }
       // Convert the userId to string
       const user = await this.userRepo.FindUserById({
@@ -130,11 +162,12 @@ export class AuthService {
       });
 
       return user;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error verifying token:", error);
-      throw new CustomError("Failed to verify token.", StatusCode.NotFound);
+      throw error;
     }
   }
+
   async Login(userDetails: UserSignInSchemaType): Promise<string> {
     try {
       // Call the user repository to find the user by email
